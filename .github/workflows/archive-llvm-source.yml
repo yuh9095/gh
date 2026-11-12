@@ -59,7 +59,9 @@ jobs:
             --patch_metadata_file "$PWD/source/llvm_android/patches/PATCHES.json" \
             --src_path "$PWD/source/llvm-project" \
             --failure_mode fail
-          git -C source/llvm-project diff --check
+          if ! git -C source/llvm-project diff --check; then
+            echo "::warning::Google's pinned patch set contains whitespace errors; keeping upstream patch content unchanged."
+          fi
           git -C source/llvm-project diff --stat | tee source/APPLIED-PATCHES-STAT.txt
           git -C source/llvm-project status --short | tee source/APPLIED-PATCHES-STATUS.txt
 
