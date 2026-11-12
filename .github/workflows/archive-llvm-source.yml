@@ -1,0 +1,107 @@
+name: Archive Google LLVM r487747c patched sources
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    name: Prepare patched source archive
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    env:
+      LLVM_PROJECT_REV: d9f89f4d16663d5012e5c09495f3b30ece3d2362
+      LLVM_ANDROID_REV: 8443a75fcd5c80245b194f6510b98a11098fe7fe
+      LLVM_SVN_REV: "487747"
+      TOOLCHAIN_UTILS_REV: 61074474aaa4ed8c663fec2e98764653db00300d
+      SOURCE_TAG: llvm-r487747c-patched-source
+
+    steps:
+      - name: Install archive tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends git curl ca-certificates python3 xz-utils
+
+      - name: Fetch pinned source repositories
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p source
+          git clone https://android.googlesource.com/toolchain/llvm-project source/llvm-project
+          git -C source/llvm-project fetch --depth=1 origin "$LLVM_PROJECT_REV"
+          git -C source/llvm-project checkout --detach "$LLVM_PROJECT_REV"
+
+          git clone https://android.googlesource.com/toolchain/llvm_android source/llvm_android
+          git -C source/llvm_android fetch --depth=1 origin "$LLVM_ANDROID_REV"
+          git -C source/llvm_android checkout --detach "$LLVM_ANDROID_REV"
+
+          git clone https://android.googlesource.com/platform/external/toolchain-utils source/toolchain-utils
+          git -C source/toolchain-utils fetch --depth=1 origin "$TOOLCHAIN_UTILS_REV"
+          git -C source/toolchain-utils checkout --detach "$TOOLCHAIN_UTILS_REV"
+
+          test "$(git -C source/llvm-project rev-parse HEAD)" = "$LLVM_PROJECT_REV"
+          test "$(git -C source/llvm_android rev-parse HEAD)" = "$LLVM_ANDROID_REV"
+          test "$(git -C source/toolchain-utils rev-parse HEAD)" = "$TOOLCHAIN_UTILS_REV"
+
+      - name: Apply all Google patches for LLVM r487747
+        shell: bash
+        run: |
+          set -euxo pipefail
+          export PYTHONPATH="$PWD/source/toolchain-utils:${PYTHONPATH:-}"
+          python3 source/toolchain-utils/llvm_tools/patch_manager.py \
+            --svn_version "$LLVM_SVN_REV" \
+            --patch_metadata_file "$PWD/source/llvm_android/patches/PATCHES.json" \
+            --src_path "$PWD/source/llvm-project" \
+            --failure_mode fail
+          git -C source/llvm-project diff --check
+          git -C source/llvm-project diff --stat | tee source/APPLIED-PATCHES-STAT.txt
+          git -C source/llvm-project status --short | tee source/APPLIED-PATCHES-STATUS.txt
+
+      - name: Remove Git metadata and write provenance
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat > source/SOURCE-PROVENANCE.txt <<EOF
+          Google Android LLVM source archive
+          LLVM SVN revision: $LLVM_SVN_REV
+          llvm-project commit: $LLVM_PROJECT_REV
+          llvm_android commit: $LLVM_ANDROID_REV
+          toolchain-utils commit: $TOOLCHAIN_UTILS_REV
+          Patch source: llvm_android/patches/PATCHES.json
+          Patch application: toolchain-utils/llvm_tools/patch_manager.py
+          Patch failure mode: fail
+          Git metadata: removed from all bundled source trees
+          Build: not performed; this archive contains source only
+          EOF
+
+          find source -type d -name .git -prune -exec rm -rf {} +
+          if find source -name .git -print -quit | grep -q .; then
+            echo "Git metadata still exists" >&2
+            exit 1
+          fi
+
+          tar -cJf llvm-r487747c-google-patched-source.tar.xz source
+          sha256sum llvm-r487747c-google-patched-source.tar.xz > llvm-r487747c-google-patched-source.tar.xz.sha256
+          ls -lh llvm-r487747c-google-patched-source.tar.xz*
+
+      - name: Publish source archive to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          if gh release view "$SOURCE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$SOURCE_TAG" \
+              llvm-r487747c-google-patched-source.tar.xz \
+              llvm-r487747c-google-patched-source.tar.xz.sha256 \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$SOURCE_TAG" \
+              llvm-r487747c-google-patched-source.tar.xz \
+              llvm-r487747c-google-patched-source.tar.xz.sha256 \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Google LLVM r487747c patched source" \
+              --notes "Source-only archive. Google patches selected by PATCHES.json were applied with patch_manager.py in fail-on-error mode. All bundled .git metadata was removed. No compiler build is performed by this workflow."
+          fi
