@@ -142,14 +142,14 @@ jobs:
           test -x "$LLVM_TABLEGEN"
           test -x "$CLANG_TABLEGEN"
 
+          # Do not set CMAKE_SYSROOT here: Ubuntu's cross libc linker script
+          # contains absolute /usr/aarch64-linux-gnu paths, which LLD would
+          # incorrectly re-root and look up twice when a sysroot is active.
           cmake -G Ninja \
             -S llvm-project/llvm \
             -B build-arm64 \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_SYSTEM_NAME=Linux \
-            # Do not set CMAKE_SYSROOT here: Ubuntu's cross libc linker script
-            # contains absolute /usr/aarch64-linux-gnu paths, which LLD would
-            # incorrectly re-root and look up twice when a sysroot is active.
             -DCMAKE_C_COMPILER="$BOOTSTRAP_BIN/clang" \
             -DCMAKE_CXX_COMPILER="$BOOTSTRAP_BIN/clang++" \
             -DCMAKE_C_COMPILER_TARGET=aarch64-linux-gnu \
