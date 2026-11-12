@@ -293,7 +293,8 @@ jobs:
             -DBUILTINS_aarch64-linux-android21_COMPILER_RT_DEFAULT_TARGET_ONLY=ON \
             -DBUILTINS_aarch64-linux-android21_COMPILER_RT_BUILTINS_HIDE_SYMBOLS=TRUE \
             -DBUILTINS_aarch64-linux-android21_COMPILER_RT_EXCLUDE_ATOMIC_BUILTIN=OFF \
-            -DBUILTINS_aarch64-linux-android21_COMPILER_RT_OS_DIR=android \
+            -DBUILTINS_aarch64-linux-android21_COMPILER_RT_OS_DIR=linux \
+            -DBUILTINS_aarch64-linux-android21_ANDROID_PLATFORM_LEVEL=21 \
             -DBUILTINS_aarch64-elf_CMAKE_C_COMPILER_TARGET=aarch64-elf \
             -DBUILTINS_aarch64-elf_CMAKE_CXX_COMPILER_TARGET=aarch64-elf \
             -DBUILTINS_aarch64-elf_CMAKE_C_FLAGS="--target=aarch64-elf -ffreestanding" \
@@ -326,6 +327,19 @@ jobs:
 
           cmake --install build-arm64
 
+          # Match Google's BuiltinsBuilder installation layout: Android NDK
+          # builtins live in the Clang resource lib/linux directory with the
+          # -android suffix; AArch64 bare-metal builtins live in lib/baremetal.
+          ANDROID_BUILTINS_ARCHIVE="$(find build-arm64 -type f -name 'libclang_rt.builtins-aarch64-android.a' -print -quit)"
+          BAREMETAL_BUILTINS_ARCHIVE="$(find build-arm64 -type f -name 'libclang_rt.builtins-aarch64.a' -print -quit)"
+          test -n "$ANDROID_BUILTINS_ARCHIVE"
+          test -n "$BAREMETAL_BUILTINS_ARCHIVE"
+          RESOURCE_DIR="$(find stage/lib/clang -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$RESOURCE_DIR"
+          mkdir -p "$RESOURCE_DIR/lib/linux" "$RESOURCE_DIR/lib/baremetal"
+          install -m 0644 "$ANDROID_BUILTINS_ARCHIVE" "$RESOURCE_DIR/lib/linux/libclang_rt.builtins-aarch64-android.a"
+          install -m 0644 "$BAREMETAL_BUILTINS_ARCHIVE" "$RESOURCE_DIR/lib/baremetal/libclang_rt.builtins-aarch64.a"
+
       - name: Verify ARM64 toolchain components
         shell: bash
         run: |
@@ -357,13 +371,11 @@ jobs:
           # Android's triple carries API level 21; bare-metal uses aarch64-elf.
           mapfile -t ANDROID_BUILTINS < <(
             find stage/lib/clang -type f \
-              -path '*/aarch64-linux-android21/*' \
-              -name 'libclang_rt.builtins*' -print
+              -path '*/lib/linux/libclang_rt.builtins-aarch64-android.a' -print
           )
           mapfile -t BAREMETAL_BUILTINS < <(
             find stage/lib/clang -type f \
-              -path '*/aarch64-elf/*' \
-              -name 'libclang_rt.builtins*' -print
+              -path '*/lib/baremetal/libclang_rt.builtins-aarch64.a' -print
           )
           test "${#ANDROID_BUILTINS[@]}" -gt 0
           test "${#BAREMETAL_BUILTINS[@]}" -gt 0
