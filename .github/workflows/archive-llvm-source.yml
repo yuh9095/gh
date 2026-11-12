@@ -2,6 +2,10 @@ name: Archive Google LLVM r487747c patched sources
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/archive-llvm-source.yml"
 
 permissions:
   contents: write
