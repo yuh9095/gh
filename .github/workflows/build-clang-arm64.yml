@@ -24,6 +24,7 @@ jobs:
       LLVM_PROJECT_REV: d9f89f4d16663d5012e5c09495f3b30ece3d2362
       LLVM_ANDROID_REV: 8443a75fcd5c80245b194f6510b98a11098fe7fe
       LLVM_SVN_REV: "487747"
+      TOOLCHAIN_UTILS_REV: 61074474aaa4ed8c663fec2e98764653db00300d
       PREBUILT_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r487747c.tar.gz
 
     steps:
@@ -84,7 +85,9 @@ jobs:
           # PATCHES.json is the source of truth. Do not apply every *.patch
           # file with a shell glob: patch_manager filters by SVN version and
           # applies the metadata-defined patch set in the intended order.
-          git clone --depth=1 https://android.googlesource.com/platform/external/toolchain-utils toolchain-utils
+          git clone https://android.googlesource.com/platform/external/toolchain-utils toolchain-utils
+          git -C toolchain-utils fetch --depth=1 origin "$TOOLCHAIN_UTILS_REV"
+          git -C toolchain-utils checkout --detach "$TOOLCHAIN_UTILS_REV"
           export PYTHONPATH="$PWD/toolchain-utils:$PYTHONPATH"
 
           python3 toolchain-utils/llvm_tools/patch_manager.py \
