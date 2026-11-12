@@ -191,6 +191,14 @@ jobs:
           # Build the default "all" target: LLVM, Clang, LLD, Clang Tools Extra,
           # Polly, BOLT, and the selected ARM64 compiler runtimes.
           cmake --build build-arm64 --parallel 2
+
+          # LLVMTableGen is required by the generated install script. Rebuild
+          # this archive explicitly so Ninja recreates it if it was removed
+          # or omitted after the aggregate build, then verify it before install.
+          cmake --build build-arm64 --target LLVMTableGen --parallel 2
+          test -s build-arm64/lib/libLLVMTableGen.a
+          file build-arm64/lib/libLLVMTableGen.a
+
           cmake --install build-arm64
 
       - name: Verify ARM64 toolchain components
