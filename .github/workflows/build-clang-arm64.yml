@@ -196,16 +196,26 @@ jobs:
           cmake --build build-arm64 --parallel 2
           cmake --install build-arm64
 
-      - name: Verify ARM64 executables
+      - name: Verify ARM64 toolchain components
         shell: bash
         run: |
           set -euxo pipefail
-          file stage/bin/clang stage/bin/clang++
-          file stage/bin/ld.lld
-          readelf -h stage/bin/clang | grep -E "Class:|Machine:"
-          readelf -l stage/bin/clang | grep -E "interpreter|Requesting"
+          # Check the principal Clang, Clang Tools Extra, LLVM utilities,
+          # linker, and BOLT executables are installed.
+          for tool in \
+            clang clang++ clang-format clang-tidy clangd clang-scan-deps \
+            ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-readobj \
+            llvm-strip llvm-ranlib llvm-config llvm-as llvm-dis llvm-link \
+            llvm-symbolizer llvm-profdata llvm-cov llvm-dwarfdump \
+            llvm-size llvm-strings llvm-bolt; do
+            test -x "stage/bin/$tool"
+            readelf -h "stage/bin/$tool" | grep -q "Machine:.*AArch64"
+          done
+
+          file stage/bin/clang stage/bin/clang++ stage/bin/ld.lld
           qemu-aarch64 -L /usr/aarch64-linux-gnu stage/bin/clang --version
           qemu-aarch64 -L /usr/aarch64-linux-gnu stage/bin/ld.lld --version
+          find stage -name 'libclang_rt.builtins-aarch64.a' -print -quit | grep .
 
       - name: Package toolchain and build provenance
         shell: bash
