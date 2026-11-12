@@ -10,9 +10,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: clang-r487747c-arm64
-  cancel-in-progress: false
 
 jobs:
   build:
