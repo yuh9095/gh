@@ -250,10 +250,27 @@ jobs:
             -DCLANG_ENABLE_STATIC_ANALYZER=ON \
             -DCLANG_ENABLE_ARCMT=OFF \
             -DLLVM_BUILD_RUNTIME=ON \
-            -DLLVM_BUILTIN_TARGETS=aarch64-linux-gnu \
+            # Build three distinct AArch64 compiler-rt builtins variants:
+            # Linux GNU (kernel/toolchain host use), Android NDK API 21, and
+            # bare-metal ELF. Keep these as separate per-target builds so
+            # their target macros and runtime output directories cannot mix.
+            -DLLVM_BUILTIN_TARGETS="aarch64-linux-gnu;aarch64-linux-android21;aarch64-elf" \
             -DLLVM_RUNTIME_TARGETS=aarch64-linux-gnu \
             -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
             -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+            -DBUILTINS_aarch64-linux-android21_CMAKE_C_COMPILER_TARGET=aarch64-linux-android21 \
+            -DBUILTINS_aarch64-linux-android21_CMAKE_CXX_COMPILER_TARGET=aarch64-linux-android21 \
+            -DBUILTINS_aarch64-linux-android21_CMAKE_C_FLAGS="--target=aarch64-linux-android21 -ffreestanding -mbranch-protection=standard" \
+            -DBUILTINS_aarch64-linux-android21_CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DBUILTINS_aarch64-linux-android21_COMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+            -DBUILTINS_aarch64-linux-android21_COMPILER_RT_OS_DIR=android \
+            -DBUILTINS_aarch64-linux-android21_COMPILER_RT_EXCLUDE_ATOMIC_BUILTIN=OFF \
+            -DBUILTINS_aarch64-elf_CMAKE_C_COMPILER_TARGET=aarch64-elf \
+            -DBUILTINS_aarch64-elf_CMAKE_CXX_COMPILER_TARGET=aarch64-elf \
+            -DBUILTINS_aarch64-elf_CMAKE_C_FLAGS="--target=aarch64-elf -ffreestanding" \
+            -DBUILTINS_aarch64-elf_CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DBUILTINS_aarch64-elf_COMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+            -DBUILTINS_aarch64-elf_COMPILER_RT_BAREMETAL_BUILD=ON \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
             -DLLVM_ENABLE_LIBXML2=OFF \
@@ -303,6 +320,22 @@ jobs:
           )
           test "${#BUILTINS_ARCHIVES[@]}" -gt 0
 
+          # The two additional Google-style targets must be installed too.
+          # Android's triple carries API level 21; bare-metal uses aarch64-elf.
+          mapfile -t ANDROID_BUILTINS < <(
+            find stage/lib/clang -type f \
+              -path '*/aarch64-linux-android21/*' \
+              -name 'libclang_rt.builtins*' -print
+          )
+          mapfile -t BAREMETAL_BUILTINS < <(
+            find stage/lib/clang -type f \
+              -path '*/aarch64-elf/*' \
+              -name 'libclang_rt.builtins*' -print
+          )
+          test "${#ANDROID_BUILTINS[@]}" -gt 0
+          test "${#BAREMETAL_BUILTINS[@]}" -gt 0
+          BUILTINS_ARCHIVES+=("${ANDROID_BUILTINS[@]}" "${BAREMETAL_BUILTINS[@]}")
+
           # Verify the archive is non-empty and every extracted member is an
           # AArch64 ELF object. Use the host cross-binutils; stage/bin tools
           # are AArch64 executables and cannot run directly on this x86_64 job.
@@ -333,6 +366,7 @@ jobs:
             echo "llvm_svn_revision=$LLVM_SVN_REV"
             echo "prebuilt=$PREBUILT_URL"
             echo "host_target=aarch64-linux-gnu"
+            echo "compiler_rt_builtins_targets=aarch64-linux-gnu,aarch64-linux-android21,aarch64-elf"
             echo "native_tablegen=build-native/bin/llvm-tblgen,build-native/bin/clang-tblgen"
             echo "google_patches=PATCHES.json via toolchain-utils patch_manager.py"
           } > stage/BUILD-PROVENANCE.txt
