@@ -87,11 +87,80 @@ jobs:
           git -C toolchain-utils checkout --detach "$TOOLCHAIN_UTILS_REV"
           export PYTHONPATH="$PWD/toolchain-utils:${PYTHONPATH:-}"
 
+          PATCH_LOG="$RUNNER_TEMP/google-patch-manager.log"
           python3 toolchain-utils/llvm_tools/patch_manager.py \
             --svn_version "$LLVM_SVN_REV" \
             --patch_metadata_file "$PWD/llvm_android/patches/PATCHES.json" \
             --src_path "$PWD/llvm-project" \
-            --failure_mode fail
+            --failure_mode fail 2>&1 | tee "$PATCH_LOG"
+
+          # Audit the exact version-filtered patch set against patch_manager's
+          # own applied-patch report. Never infer success from git diff alone.
+          python3 - "$PWD/llvm_android/patches/PATCHES.json" "$LLVM_SVN_REV" "$PATCH_LOG" <<'PY'
+          import collections
+          import json
+          import pathlib
+          import sys
+
+          metadata_path = pathlib.Path(sys.argv[1])
+          svn_version = int(sys.argv[2])
+          log_path = pathlib.Path(sys.argv[3])
+          entries = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+          def applies(entry):
+              version_range = entry.get("version_range") or {}
+              first = version_range.get("from") or 0
+              until = version_range.get("until")
+              return first <= svn_version and (until is None or svn_version < until)
+
+          expected = [entry["rel_patch_path"] for entry in entries if applies(entry)]
+          log_lines = log_path.read_text(encoding="utf-8").splitlines()
+          applied = []
+          in_applied_section = False
+          for line in log_lines:
+              stripped = line.strip()
+              if stripped == "The following patches applied successfully:":
+                  in_applied_section = True
+                  continue
+              if in_applied_section:
+                  if not stripped:
+                      in_applied_section = False
+                  else:
+                      applied.append(stripped)
+
+          def matches_report(path):
+              return any(item.endswith("/" + path) or item == path for item in applied)
+
+          missing = [path for path in expected if not matches_report(path)]
+          counts = collections.Counter()
+          for entry in entries:
+              if not applies(entry):
+                  continue
+              title = (entry.get("metadata") or {}).get("title", "")
+              path = entry["rel_patch_path"]
+              component = "unclassified"
+              if title.startswith("[") and "]" in title:
+                  component = title[1:title.index("]")]
+              elif "compiler-rt" in path.lower():
+                  component = "compiler-rt"
+              counts[component] += 1
+
+          print(f"PATCH AUDIT: LLVM SVN r{svn_version}")
+          print(f"PATCH AUDIT: metadata entries={len(entries)}")
+          print(f"PATCH AUDIT: applicable={len(expected)}")
+          print(f"PATCH AUDIT: reported applied={len(applied)}")
+          for component, count in sorted(counts.items()):
+              print(f"PATCH AUDIT: component {component}={count}")
+          if missing:
+              print("PATCH AUDIT ERROR: applicable patches missing from applied report:")
+              for path in missing:
+                  print(f"  {path}")
+              raise SystemExit(1)
+          if len(applied) != len(expected):
+              print("PATCH AUDIT ERROR: applied count does not match applicable count")
+              raise SystemExit(1)
+          print("PATCH AUDIT: PASS — every version-applicable patch is reported applied")
+          PY
 
           git -C llvm-project status --short
           if ! git -C llvm-project diff --check; then
