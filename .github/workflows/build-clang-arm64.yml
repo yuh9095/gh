@@ -76,6 +76,23 @@ jobs:
           echo "BOOTSTRAP_BIN=$BOOTSTRAP_BIN" >> "$GITHUB_ENV"
           "$BOOTSTRAP_BIN/clang" --version
 
+      - name: Download Android NDK sysroot for compiler-rt builtins
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$RUNNER_TEMP/android-ndk"
+          curl -fL --retry 3 "$ANDROID_NDK_URL" -o "$RUNNER_TEMP/android-ndk.zip"
+          unzip -q "$RUNNER_TEMP/android-ndk.zip" -d "$RUNNER_TEMP/android-ndk"
+          ANDROID_NDK_ROOT="$RUNNER_TEMP/android-ndk/android-ndk-r26d"
+          ANDROID_NDK_SYSROOT="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          test -d "$ANDROID_NDK_SYSROOT/usr/include"
+          test -d "$ANDROID_NDK_SYSROOT/usr/lib/aarch64-linux-android"
+          test -d "$ANDROID_NDK_SYSROOT/usr/lib/aarch64-linux-android/21"
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_SYSROOT=$ANDROID_NDK_SYSROOT" >> "$GITHUB_ENV"
+          echo "Android NDK r26d sysroot: $ANDROID_NDK_SYSROOT"
+          du -sh "$ANDROID_NDK_SYSROOT"
+
       - name: Apply Google patches from PATCHES.json
         shell: bash
         run: |
