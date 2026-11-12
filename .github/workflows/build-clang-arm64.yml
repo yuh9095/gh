@@ -217,6 +217,9 @@ jobs:
           # Do not set CMAKE_SYSROOT here: Ubuntu's cross libc linker script
           # contains absolute /usr/aarch64-linux-gnu paths, which LLD would
           # incorrectly re-root and look up twice when a sysroot is active.
+          # Build distinct AArch64 compiler-rt builtins variants for Linux
+          # GNU, Android NDK API 21, and bare-metal ELF. Per-target flags keep
+          # their target macros and runtime output directories separate.
           cmake -G Ninja \
             -S llvm-project/llvm \
             -B build-arm64 \
@@ -250,10 +253,6 @@ jobs:
             -DCLANG_ENABLE_STATIC_ANALYZER=ON \
             -DCLANG_ENABLE_ARCMT=OFF \
             -DLLVM_BUILD_RUNTIME=ON \
-            # Build three distinct AArch64 compiler-rt builtins variants:
-            # Linux GNU (kernel/toolchain host use), Android NDK API 21, and
-            # bare-metal ELF. Keep these as separate per-target builds so
-            # their target macros and runtime output directories cannot mix.
             -DLLVM_BUILTIN_TARGETS="aarch64-linux-gnu;aarch64-linux-android21;aarch64-elf" \
             -DLLVM_RUNTIME_TARGETS=aarch64-linux-gnu \
             -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
