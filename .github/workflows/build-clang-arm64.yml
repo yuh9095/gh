@@ -88,7 +88,7 @@ jobs:
           git clone https://android.googlesource.com/platform/external/toolchain-utils toolchain-utils
           git -C toolchain-utils fetch --depth=1 origin "$TOOLCHAIN_UTILS_REV"
           git -C toolchain-utils checkout --detach "$TOOLCHAIN_UTILS_REV"
-          export PYTHONPATH="$PWD/toolchain-utils:$PYTHONPATH"
+          export PYTHONPATH="$PWD/toolchain-utils:${PYTHONPATH:-}"
 
           python3 toolchain-utils/llvm_tools/patch_manager.py \
             --svn_version "$LLVM_SVN_REV" \
