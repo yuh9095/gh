@@ -133,6 +133,7 @@ jobs:
 
           missing = [path for path in expected if not matches_report(path)]
           counts = collections.Counter()
+          applied_counts = collections.Counter()
           for entry in entries:
               if not applies(entry):
                   continue
@@ -144,13 +145,18 @@ jobs:
               elif "compiler-rt" in path.lower():
                   component = "compiler-rt"
               counts[component] += 1
+              if matches_report(path):
+                  applied_counts[component] += 1
 
           print(f"PATCH AUDIT: LLVM SVN r{svn_version}")
           print(f"PATCH AUDIT: metadata entries={len(entries)}")
           print(f"PATCH AUDIT: applicable={len(expected)}")
           print(f"PATCH AUDIT: reported applied={len(applied)}")
           for component, count in sorted(counts.items()):
-              print(f"PATCH AUDIT: component {component}={count}")
+              print(
+                  f"PATCH AUDIT: component {component}: "
+                  f"applicable={count} applied={applied_counts[component]}"
+              )
           if missing:
               print("PATCH AUDIT ERROR: applicable patches missing from applied report:")
               for path in missing:
