@@ -23,6 +23,8 @@ jobs:
       LLVM_SVN_REV: "487747"
       TOOLCHAIN_UTILS_REV: 61074474aaa4ed8c663fec2e98764653db00300d
       PREBUILT_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r487747c.tar.gz
+      ANDROID_NDK_VERSION: 26.3.11579264
+      ANDROID_NDK_URL: https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
 
     steps:
       - name: Checkout workflow repository
@@ -35,7 +37,7 @@ jobs:
             build-essential cmake ninja-build git curl ca-certificates \
             python3 python3-pip xz-utils file binutils \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu qemu-user
+            binutils-aarch64-linux-gnu qemu-user unzip
           df -h /
 
       - name: Fetch pinned Google LLVM sources
@@ -259,11 +261,11 @@ jobs:
             -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
             -DBUILTINS_aarch64-linux-android21_CMAKE_C_COMPILER_TARGET=aarch64-linux-android21 \
             -DBUILTINS_aarch64-linux-android21_CMAKE_CXX_COMPILER_TARGET=aarch64-linux-android21 \
-            -DBUILTINS_aarch64-linux-android21_CMAKE_C_FLAGS="--target=aarch64-linux-android21 -ffreestanding -mbranch-protection=standard" \
+            -DBUILTINS_aarch64-linux-android21_CMAKE_SYSROOT="$ANDROID_NDK_SYSROOT" \
+            -DBUILTINS_aarch64-linux-android21_CMAKE_C_FLAGS="--target=aarch64-linux-android21 --sysroot=$ANDROID_NDK_SYSROOT -ffreestanding -mbranch-protection=standard" \
+            -DBUILTINS_aarch64-linux-android21_CMAKE_CXX_FLAGS="--target=aarch64-linux-android21 --sysroot=$ANDROID_NDK_SYSROOT -ffreestanding -mbranch-protection=standard" \
             -DBUILTINS_aarch64-linux-android21_CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
             -DBUILTINS_aarch64-linux-android21_COMPILER_RT_DEFAULT_TARGET_ONLY=ON \
-            -DBUILTINS_aarch64-linux-android21_COMPILER_RT_OS_DIR=android \
-            -DBUILTINS_aarch64-linux-android21_COMPILER_RT_EXCLUDE_ATOMIC_BUILTIN=OFF \
             -DBUILTINS_aarch64-elf_CMAKE_C_COMPILER_TARGET=aarch64-elf \
             -DBUILTINS_aarch64-elf_CMAKE_CXX_COMPILER_TARGET=aarch64-elf \
             -DBUILTINS_aarch64-elf_CMAKE_C_FLAGS="--target=aarch64-elf -ffreestanding" \
@@ -366,6 +368,8 @@ jobs:
             echo "prebuilt=$PREBUILT_URL"
             echo "host_target=aarch64-linux-gnu"
             echo "compiler_rt_builtins_targets=aarch64-linux-gnu,aarch64-linux-android21,aarch64-elf"
+            echo "android_ndk_version=$ANDROID_NDK_VERSION"
+            echo "android_ndk_sysroot=$ANDROID_NDK_SYSROOT"
             echo "native_tablegen=build-native/bin/llvm-tblgen,build-native/bin/clang-tblgen"
             echo "google_patches=PATCHES.json via toolchain-utils patch_manager.py"
           } > stage/BUILD-PROVENANCE.txt
