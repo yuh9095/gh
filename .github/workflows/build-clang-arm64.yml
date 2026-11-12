@@ -330,8 +330,8 @@ jobs:
           # Match Google's BuiltinsBuilder installation layout: Android NDK
           # builtins live in the Clang resource lib/linux directory with the
           # -android suffix; AArch64 bare-metal builtins live in lib/baremetal.
-          ANDROID_BUILTINS_ARCHIVE="$(find build-arm64 -type f -name 'libclang_rt.builtins-aarch64-android.a' -print -quit)"
-          BAREMETAL_BUILTINS_ARCHIVE="$(find build-arm64 -type f -name 'libclang_rt.builtins-aarch64.a' -print -quit)"
+          ANDROID_BUILTINS_ARCHIVE="$(find build-arm64 -type f -path '*/linux/libclang_rt.builtins-aarch64-android.a' -print -quit)"
+          BAREMETAL_BUILTINS_ARCHIVE="$(find build-arm64 -type f -path '*/baremetal/libclang_rt.builtins-aarch64.a' -print -quit)"
           test -n "$ANDROID_BUILTINS_ARCHIVE"
           test -n "$BAREMETAL_BUILTINS_ARCHIVE"
           RESOURCE_DIR="$(find stage/lib/clang -mindepth 1 -maxdepth 1 -type d -print -quit)"
