@@ -337,8 +337,8 @@ jobs:
           test -n "$RESOURCE_DIR"
           mkdir -p "$RESOURCE_DIR/lib/linux" "$RESOURCE_DIR/lib/baremetal"
           install -m 0644 "$ANDROID_BUILTINS_ARCHIVE" "$RESOURCE_DIR/lib/linux/libclang_rt.builtins-aarch64-android.a"
-          mkdir -p "$PWD/stage/runtimes_ndk_cxx/aarch64"
-          install -m 0644 "$ANDROID_BUILTINS_ARCHIVE" "$PWD/stage/runtimes_ndk_cxx/aarch64/libclang_rt.builtins-aarch64-android.a"
+          mkdir -p "$PWD/stage/runtimes_ndk_cxx"
+          install -m 0644 "$ANDROID_BUILTINS_ARCHIVE" "$PWD/stage/runtimes_ndk_cxx/libclang_rt.builtins-aarch64-android.a"
           install -m 0644 "$BAREMETAL_BUILTINS_ARCHIVE" "$RESOURCE_DIR/lib/baremetal/libclang_rt.builtins-aarch64.a"
 
       - name: Verify ARM64 toolchain components
@@ -414,7 +414,7 @@ jobs:
             echo "host_target=aarch64-linux-gnu"
             echo "compiler_rt_builtins_targets=aarch64-linux-gnu,aarch64-linux-android21,aarch64-elf"
             echo "android_ndk_version=$ANDROID_NDK_VERSION"
-            echo "android_builtins_install=lib/linux and runtimes_ndk_cxx/aarch64"
+            echo "android_builtins_install=lib/linux and runtimes_ndk_cxx"
             echo "baremetal_builtins_install=lib/baremetal"
             echo "android_ndk_sysroot=$ANDROID_NDK_SYSROOT"
             echo "native_tablegen=build-native/bin/llvm-tblgen,build-native/bin/clang-tblgen"
