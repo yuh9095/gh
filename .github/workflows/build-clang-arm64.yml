@@ -295,7 +295,33 @@ jobs:
           file stage/bin/clang stage/bin/clang++ stage/bin/ld.lld
           qemu-aarch64 -L /usr/aarch64-linux-gnu stage/bin/clang --version
           qemu-aarch64 -L /usr/aarch64-linux-gnu stage/bin/ld.lld --version
-          find stage -name 'libclang_rt.builtins-aarch64.a' -print -quit | grep .
+          # compiler-rt installs the Linux GNU builtins archive as
+          # <resource-dir>/lib/aarch64-linux-gnu/libclang_rt.builtins.a.
+          mapfile -t BUILTINS_ARCHIVES < <(
+            find stage/lib/clang -type f \
+              -path '*/aarch64-linux-gnu/libclang_rt.builtins.a' -print
+          )
+          test "${#BUILTINS_ARCHIVES[@]}" -gt 0
+
+          # Verify the archive is non-empty and every extracted member is an
+          # AArch64 ELF object. Use the host cross-binutils; stage/bin tools
+          # are AArch64 executables and cannot run directly on this x86_64 job.
+          for archive in "${BUILTINS_ARCHIVES[@]}"; do
+            test -s "$archive"
+            member_dir="$(mktemp -d)"
+            (
+              cd "$member_dir"
+              aarch64-linux-gnu-ar x "$GITHUB_WORKSPACE/$archive"
+              member_count=0
+              while IFS= read -r -d '' member; do
+                readelf -h "$member" | grep -q "Machine:.*AArch64"
+                member_count=$((member_count + 1))
+              done < <(find . -type f -print0)
+              test "$member_count" -gt 0
+              echo "Verified $member_count AArch64 ELF members in $archive"
+            )
+            rm -rf "$member_dir"
+          done
 
       - name: Package toolchain and build provenance
         shell: bash
